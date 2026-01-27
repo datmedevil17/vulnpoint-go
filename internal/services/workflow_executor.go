@@ -57,6 +57,8 @@ func (e *WorkflowExecutor) Execute(workflow *models.Workflow, userID uuid.UUID) 
 		return nil, fmt.Errorf("failed to create execution record: %w", err)
 	}
 
+	execution.Name = workflow.Name
+
 	// Launch async execution
 	go e.executeAsync(execution.ID, workflow)
 
@@ -443,10 +445,21 @@ func (e *WorkflowExecutor) executeNotification(node *WorkflowNode, previousResul
 
 	// Determine recipient email
 	recipientEmail := user.Email
-	if email, ok := node.Data["email"].(string); ok && email != "" {
-		recipientEmail = email
-	} else if to, ok := node.Data["to"].(string); ok && to != "" {
-		recipientEmail = to
+
+	// The frontend stores config in data.config.email or data.config.to
+	if config, ok := node.Data["config"].(map[string]interface{}); ok {
+		if email, ok := config["email"].(string); ok && email != "" {
+			recipientEmail = email
+		} else if to, ok := config["to"].(string); ok && to != "" {
+			recipientEmail = to
+		}
+	} else {
+		// Fallback to flat structure if config is missing
+		if email, ok := node.Data["email"].(string); ok && email != "" {
+			recipientEmail = email
+		} else if to, ok := node.Data["to"].(string); ok && to != "" {
+			recipientEmail = to
+		}
 	}
 
 	if recipientEmail == "" {
@@ -457,6 +470,8 @@ func (e *WorkflowExecutor) executeNotification(node *WorkflowNode, previousResul
 			"error":  "no recipient email provided",
 		}, nil
 	}
+
+	log.Printf("📧 Sending notification to: %s", recipientEmail)
 
 	// Send email with report
 	if err := e.notificationService.SendWorkflowReport(recipientEmail, target, "completed", aiReport); err != nil {

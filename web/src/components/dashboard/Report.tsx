@@ -53,7 +53,7 @@ const ReportCardPage = () => {
     try {
       setLoading(true);
       const response = await workflowApi.getAllExecutionResults();
-      setReports(response.reports || []);
+      setReports(response.data || []);
     } catch (error) {
       console.error("Error fetching reports:", error);
       toast.error("Failed to load reports");

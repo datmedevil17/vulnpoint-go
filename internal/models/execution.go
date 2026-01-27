@@ -11,16 +11,18 @@ import (
 
 type WorkflowExecution struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
-	WorkflowID  uuid.UUID  `gorm:"type:uuid;not null" json:"workflow_id"`
-	UserID      uuid.UUID  `gorm:"type:uuid;not null" json:"user_id"`
+	WorkflowID  uuid.UUID  `gorm:"type:uuid;not null" json:"workflowId"`
+	UserID      uuid.UUID  `gorm:"type:uuid;not null" json:"userId"`
 	Status      string     `gorm:"default:'pending'" json:"status"` // pending, running, completed, failed
-	CurrentNode string     `json:"current_node,omitempty"`
+	CurrentNode string     `json:"currentNode,omitempty"`
 	Results     JSONMap    `gorm:"type:jsonb;default:'{}'" json:"results"` // Node ID -> Result
 	Error       string     `json:"error,omitempty"`
-	StartedAt   *time.Time `json:"started_at,omitempty"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	StartedAt   *time.Time `json:"startedAt,omitempty"`
+	CompletedAt *time.Time `json:"completedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+	Name        string     `gorm:"->" json:"name"`    // Workflow name, joined from workflows table
+	Duration    int64      `gorm:"-" json:"duration"` // Duration in milliseconds
 }
 
 // JSONMap custom type for handling JSONB maps

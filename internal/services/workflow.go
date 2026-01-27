@@ -85,11 +85,28 @@ func (s *WorkflowService) ExecuteWorkflow(workflow *models.Workflow, userID uuid
 	return s.executor.Execute(workflow, userID)
 }
 
-// ListWorkflowExecutions retrieves all workflow executions for a user
+// ListWorkflowExecutions retrieves all workflow executions for a user with workflow names
 func (s *WorkflowService) ListWorkflowExecutions(userID uuid.UUID) ([]models.WorkflowExecution, error) {
 	var executions []models.WorkflowExecution
-	if err := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&executions).Error; err != nil {
+
+	// Use a join to get the workflow name
+	err := s.db.Table("workflow_executions").
+		Select("workflow_executions.*, workflows.name as name").
+		Joins("left join workflows on workflows.id = workflow_executions.workflow_id").
+		Where("workflow_executions.user_id = ?", userID).
+		Order("workflow_executions.created_at DESC").
+		Scan(&executions).Error
+
+	if err != nil {
 		return nil, err
 	}
+
+	// Calculate durations
+	for i := range executions {
+		if executions[i].StartedAt != nil && executions[i].CompletedAt != nil {
+			executions[i].Duration = executions[i].CompletedAt.Sub(*executions[i].StartedAt).Milliseconds()
+		}
+	}
+
 	return executions, nil
 }
