@@ -40,8 +40,8 @@ func main() {
 	scannerService := services.NewScannerService(db)
 	notificationService := services.NewNotificationService(cfg)
 	aiService := services.NewAIService(cfg)
-	workflowService := services.NewWorkflowService(db, scannerService, notificationService, aiService)
 	githubService := services.NewGitHubService(db)
+	workflowService := services.NewWorkflowService(db, scannerService, notificationService, aiService, githubService)
 	embeddingService := services.NewEmbeddingService()
 
 	// Initialize handlers

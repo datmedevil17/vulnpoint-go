@@ -13,10 +13,10 @@ type WorkflowService struct {
 	executor *WorkflowExecutor
 }
 
-func NewWorkflowService(db *gorm.DB, scannerService *ScannerService, notificationService *NotificationService, aiService *AIService) *WorkflowService {
+func NewWorkflowService(db *gorm.DB, scannerService *ScannerService, notificationService *NotificationService, aiService *AIService, githubService *GitHubService) *WorkflowService {
 	return &WorkflowService{
 		db:       db,
-		executor: NewWorkflowExecutor(db, scannerService, notificationService, aiService),
+		executor: NewWorkflowExecutor(db, scannerService, notificationService, aiService, githubService),
 	}
 }
 

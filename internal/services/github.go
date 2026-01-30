@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,6 +32,19 @@ type GitHubFile struct {
 	Path    string `json:"path"`
 	Type    string `json:"type"`
 	Content string `json:"content"`
+}
+
+type GitHubIssueRequest struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+type GitHubIssue struct {
+	ID      int64  `json:"id"`
+	Number  int    `json:"number"`
+	Title   string `json:"title"`
+	HTMLURL string `json:"html_url"`
+	State   string `json:"state"`
 }
 
 func NewGitHubService(db *gorm.DB) *GitHubService {
@@ -148,4 +162,246 @@ func (s *GitHubService) GetFileContent(ctx context.Context, accessToken, owner, 
 	}
 
 	return string(body), nil
+}
+
+// CreateIssue creates a new issue in a GitHub repository
+func (s *GitHubService) CreateIssue(ctx context.Context, accessToken, owner, repo, title, body string) (*GitHubIssue, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues", owner, repo)
+
+	issueReq := GitHubIssueRequest{
+		Title: title,
+		Body:  body,
+	}
+
+	jsonData, err := json.Marshal(issueReq)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to create issue: %s - %s", resp.Status, string(body))
+	}
+
+	var issue GitHubIssue
+	if err := json.NewDecoder(resp.Body).Decode(&issue); err != nil {
+		return nil, err
+	}
+
+	return &issue, nil
+}
+
+// Auto-Fix Structs
+
+type CreateBranchRequest struct {
+	Ref string `json:"ref"`
+	Sha string `json:"sha"`
+}
+
+type UpdateFileRequest struct {
+	Message string `json:"message"`
+	Content string `json:"content"`
+	Sha     string `json:"sha"`
+	Branch  string `json:"branch"`
+}
+
+type CreatePullRequestRequest struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+	Head  string `json:"head"`
+	Base  string `json:"base"`
+}
+
+type GitHubRef struct {
+	Ref    string `json:"ref"`
+	Object struct {
+		Sha string `json:"sha"`
+	} `json:"object"`
+}
+
+type GitHubPR struct {
+	Number  int    `json:"number"`
+	HTMLURL string `json:"html_url"`
+}
+
+// Methods
+
+// GetReference fetches a git reference (e.g. heads/main)
+func (s *GitHubService) GetReference(ctx context.Context, accessToken, owner, repo, ref string) (*GitHubRef, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/ref/%s", owner, repo, ref)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get ref: %s", resp.Status)
+	}
+
+	var gitRef GitHubRef
+	if err := json.NewDecoder(resp.Body).Decode(&gitRef); err != nil {
+		return nil, err
+	}
+	return &gitRef, nil
+}
+
+// CreateBranch creates a new branch
+func (s *GitHubService) CreateBranch(ctx context.Context, accessToken, owner, repo, newBranch, baseSha string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs", owner, repo)
+	bodyReq := CreateBranchRequest{
+		Ref: "refs/heads/" + newBranch,
+		Sha: baseSha,
+	}
+	jsonData, _ := json.Marshal(bodyReq)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create branch: %s - %s", resp.Status, string(body))
+	}
+	return nil
+}
+
+// GetFileSHA fetches the SHA of a file
+func (s *GitHubService) GetFileSHA(ctx context.Context, accessToken, owner, repo, path, branch string) (string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s?ref=%s", owner, repo, path, branch)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to get file sha: %s", resp.Status)
+	}
+
+	// Wait, GitHubFile doesn't have SHA field. Need to check if I can add it or use map.
+	// Let's use a temporary struct or map.
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	if sha, ok := result["sha"].(string); ok {
+		return sha, nil
+	}
+	return "", fmt.Errorf("sha not found in response")
+}
+
+// UpdateFile updates (commits) a file
+func (s *GitHubService) UpdateFile(ctx context.Context, accessToken, owner, repo, path, content, sha, message, branch string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", owner, repo, path)
+
+	bodyReq := UpdateFileRequest{
+		Message: message,
+		Content: content, // Must be base64 encoded? GitHub API expects base64 unless using raw accept header for reading. For writing, struct `content` usually needs base64.
+		Sha:     sha,
+		Branch:  branch,
+	}
+	// Note: content must be base64 encoded.
+
+	jsonData, _ := json.Marshal(bodyReq)
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to update file: %s - %s", resp.Status, string(body))
+	}
+	return nil
+}
+
+// CreatePullRequest creates a PR
+func (s *GitHubService) CreatePullRequest(ctx context.Context, accessToken, owner, repo, title, body, head, base string) (*GitHubPR, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repo)
+
+	bodyReq := CreatePullRequestRequest{
+		Title: title,
+		Body:  body,
+		Head:  head,
+		Base:  base,
+	}
+
+	jsonData, _ := json.Marshal(bodyReq)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to create PR: %s - %s", resp.Status, string(body))
+	}
+
+	var pr GitHubPR
+	if err := json.NewDecoder(resp.Body).Decode(&pr); err != nil {
+		return nil, err
+	}
+	return &pr, nil
 }

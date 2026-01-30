@@ -113,6 +113,30 @@ Please provide:
 	return "", fmt.Errorf("no AI API keys configured")
 }
 
+// GenerateFix generates a fix for vulnerable code
+func (s *AIService) GenerateFix(ctx context.Context, code string, vulnerability string) (string, error) {
+	prompt := fmt.Sprintf(`You are a security expert. Fix the following code to resolve the specified vulnerability.
+Return ONLY the fixed code without any markdown formatting or explanation.
+
+Vulnerability: %s
+
+Code:
+%s`, vulnerability, code)
+
+	if s.config.AI.GeminiAPIKey != "" {
+		result, err := s.callGemini(ctx, prompt)
+		if err == nil {
+			return result, nil
+		}
+	}
+
+	if s.config.AI.GroqAPIKey != "" {
+		return s.callGroq(ctx, prompt)
+	}
+
+	return "", fmt.Errorf("no AI API keys configured")
+}
+
 // ChatResponse generates a chatbot response
 func (s *AIService) ChatResponse(ctx context.Context, userMessage string, conversationHistory []map[string]string) (string, error) {
 	prompt := "You are a cybersecurity expert assistant. Help users understand security vulnerabilities and provide guidance.\n\n"
