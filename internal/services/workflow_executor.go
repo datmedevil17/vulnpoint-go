@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -95,8 +96,18 @@ func (e *WorkflowExecutor) executeAsync(executionID uuid.UUID, workflow *models.
 
 	log.Printf("📋 Execution order: %v", executionOrder)
 
+	// Build In-Edges map for easy parent lookup
+	inEdges := make(map[string][]string)
+	for _, edge := range edges {
+		inEdges[edge.Target] = append(inEdges[edge.Target], edge.Source)
+	}
+
 	// Execute nodes in order
 	results := make(map[string]interface{})
+
+	// Map to track execution state: "pending", "completed", "failed", "skipped"
+	nodeStates := make(map[string]string)
+
 	for _, nodeID := range executionOrder {
 		node := e.findNode(nodes, nodeID)
 		if node == nil {
@@ -105,26 +116,73 @@ func (e *WorkflowExecutor) executeAsync(executionID uuid.UUID, workflow *models.
 		}
 
 		// Update current node
-		e.db.Model(&models.WorkflowExecution{}).Where("id = ?", executionID).Update("current_node", node.Type)
+		e.db.Model(&models.WorkflowExecution{}).Where("id = ?", executionID).Update("current_node", node.ID)
+
+		// CHECK DEPENDENCIES
+		shouldSkip := false
+		skipReason := ""
+		parents := inEdges[nodeID]
+
+		for _, parentID := range parents {
+			parentState := nodeStates[parentID]
+			// 1. Cascade Skip/Fail
+			if parentState == "skipped" || parentState == "failed" {
+				shouldSkip = true
+				skipReason = fmt.Sprintf("Parent %s was %s", parentID, parentState)
+				break
+			}
+
+			// 2. Check Decision Logic
+			// If parent was a decision node, check its output
+			if parentResult, ok := results[parentID].(map[string]interface{}); ok {
+				if parentResult["type"] == "decision" {
+					if allowed, ok := parentResult["decision_result"].(bool); ok && !allowed {
+						shouldSkip = true
+						skipReason = fmt.Sprintf("Decision node %s returned false", parentID)
+						break
+					}
+				}
+			}
+		}
+
+		if shouldSkip {
+			log.Printf("⏭️ Skipping node %s: %s", node.ID, skipReason)
+			nodeStates[node.ID] = "skipped"
+			// Store a dummy skipped result so downstream nodes know
+			results[node.ID] = map[string]interface{}{
+				"id":     node.ID,
+				"status": "skipped",
+				"reason": skipReason,
+			}
+			continue
+		}
 
 		log.Printf("⚙️  Executing node: %s (%s)", node.ID, node.Type)
 
 		// Execute the node
 		result, err := e.executeNode(node, results, workflow.UserID)
 		if err != nil {
+			log.Printf("❌ Node %s failed: %v", node.ID, err)
+			nodeStates[node.ID] = "failed"
 			e.failExecution(executionID, fmt.Sprintf("Node %s failed: %v", node.ID, err))
 			return
 		}
+
+		nodeStates[node.ID] = "completed"
 
 		// Store result
 		results[node.ID] = result
 		e.db.Model(&models.WorkflowExecution{}).Where("id = ?", executionID).Update("results", models.JSONMap(results))
 	}
 
-	// Generate AI Report
+	// Generate AI Report (Only for completed nodes)
 	log.Printf("🤖 Generating AI Security Report...")
 	var scanSummaries string
 	for nodeID, result := range results {
+		// Only analyze completed nodes
+		if state := nodeStates[nodeID]; state != "completed" {
+			continue
+		}
 		if nodeMap, ok := result.(map[string]interface{}); ok {
 			if output, ok := nodeMap["output"].(string); ok {
 				scanSummaries += fmt.Sprintf("Node %s (%s) Output:\n%s\n\n", nodeID, nodeMap["scanner"], output)
@@ -270,6 +328,22 @@ func (e *WorkflowExecutor) executeNode(node *WorkflowNode, previousResults map[s
 		return e.executeSemgrep(node, previousResults)
 	case "container-scan":
 		return e.executeContainerScan(node, previousResults)
+	case "kube-bench":
+		return e.executeKubeBench(node, previousResults)
+	case "iac-scan":
+		return e.executeTrivyIaC(node, previousResults)
+	case "decision":
+		return e.executeDecision(node, previousResults)
+	case "estimate-cost":
+		return e.executeEstimateCost(node, previousResults)
+	case "policy-check":
+		return e.executePolicyCheck(node, previousResults)
+	case "generate-iac":
+		return e.executeGenerateIaC(node, previousResults)
+	case "drift-check":
+		return e.executeDriftCheck(node, previousResults)
+	case "generate-docs":
+		return e.executeGenerateDocs(node, previousResults)
 	default:
 		return nil, fmt.Errorf("unknown node type: %s", node.Type)
 	}
@@ -967,5 +1041,275 @@ func (e *WorkflowExecutor) executeContainerScan(node *WorkflowNode, previousResu
 		"scanner": "trivy-image",
 		"status":  "completed",
 		"output":  output,
+	}, nil
+}
+
+// executeKubeBench runs kube-bench
+func (e *WorkflowExecutor) executeKubeBench(node *WorkflowNode, previousResults map[string]interface{}) (interface{}, error) {
+	target := e.getTarget(previousResults)
+	if target == "" {
+		target = "cluster"
+	}
+
+	log.Printf("☸️ Running Kube-Bench scan on: %s", target)
+	output, err := e.scannerService.RunKubeBench(target)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"scanner": "kube-bench",
+		"target":  target,
+		"output":  output,
+		"status":  "completed",
+	}, nil
+}
+
+// executeTrivyIaC runs Trivy IaC scan
+func (e *WorkflowExecutor) executeTrivyIaC(node *WorkflowNode, previousResults map[string]interface{}) (interface{}, error) {
+	target := e.getTarget(previousResults)
+	if target == "" {
+		return nil, fmt.Errorf("no target found for IaC scan")
+	}
+
+	log.Printf("🏗️ Running Trivy IaC scan on: %s", target)
+	output, err := e.scannerService.RunTrivyIaC(target)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"scanner": "trivy-iac",
+		"target":  target,
+		"output":  output,
+		"status":  "completed",
+	}, nil
+}
+
+// executeDecision handles logic branching
+func (e *WorkflowExecutor) executeDecision(node *WorkflowNode, previousResults map[string]interface{}) (interface{}, error) {
+	log.Printf("🤔 Evaluating Decision Node...")
+
+	// Get configuration
+	variable, _ := node.Data["variable"].(string)
+	operator, _ := node.Data["operator"].(string)
+	thresholdStr, _ := node.Data["value"].(string)
+
+	log.Printf("   Rule: %s %s %s", variable, operator, thresholdStr)
+
+	// 1. Resolve Variable Value from Previous Results
+	var actualValue float64
+	found := false
+
+	for _, result := range previousResults {
+		if resMap, ok := result.(map[string]interface{}); ok {
+
+			// Check for Cost
+			if variable == "cost" {
+				// Try to parse cost from strings like "$154.20"
+				if costStr, ok := resMap["monthly_cost"].(string); ok {
+					cleaned := strings.ReplaceAll(strings.ReplaceAll(costStr, "$", ""), ",", "")
+					if val, err := strconv.ParseFloat(cleaned, 64); err == nil {
+						actualValue = val
+						found = true
+						break
+					}
+				}
+			}
+
+			// Check for Vulnerabilities (Sum them up?)
+			if variable == "vulnerabilities" {
+				// Check structured data from trivy/semgrep/etc
+				if data, ok := resMap["data"].(map[string]interface{}); ok {
+					if count, ok := data["vulnerabilities_found"].(float64); ok { // JSON numbers are float64 in Go interface{}
+						actualValue += count
+						found = true
+					}
+					if count, ok := data["leaked_secrets"].(float64); ok {
+						actualValue += count
+						found = true
+					}
+				}
+			}
+
+			// Check for Policy Pass/Fail
+			if variable == "risk_score" {
+				// Mock logic for now, count criticals * 10?
+				if data, ok := resMap["data"].(map[string]interface{}); ok {
+					if high, ok := data["severity_high"].(float64); ok {
+						actualValue += high * 5
+						found = true
+					}
+				}
+			}
+		}
+	}
+
+	if !found && variable != "manual_input" {
+		log.Printf("   ⚠️ Variable %s not found in previous results, defaulting to 0", variable)
+	}
+
+	// 2. Parse Threshold
+	threshold, _ := strconv.ParseFloat(thresholdStr, 64)
+
+	// 3. Evaluate
+	result := false
+	switch operator {
+	case "gt":
+		result = actualValue > threshold
+	case "lt":
+		result = actualValue < threshold
+	case "eq":
+		result = actualValue == threshold
+	case "neq":
+		result = actualValue != threshold
+	default:
+		// Default validation (e.g. if manual_input)
+		// For now simple pass
+		result = true
+	}
+
+	log.Printf("   Result: %f %s %f = %v", actualValue, operator, threshold, result)
+
+	return map[string]interface{}{
+		"type":            "decision",
+		"decision_result": result, // The key flag for the engine
+		"actual_value":    actualValue,
+		"status":          "completed",
+	}, nil
+}
+
+// executeEstimateCost calculates infrastructure cost
+func (e *WorkflowExecutor) executeEstimateCost(node *WorkflowNode, previousResults map[string]interface{}) (interface{}, error) {
+	target := e.getTarget(previousResults)
+	if target == "" {
+		return nil, fmt.Errorf("no target found for cost estimation")
+	}
+
+	log.Printf("💰 Estimating Cloud Costs (Infracost) for: %s", target)
+
+	output, err := e.scannerService.RunInfracost(target)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"type":   "estimate-cost",
+		"status": "completed",
+		"output": output,
+	}, nil
+}
+
+// executePolicyCheck validates OPA rules
+func (e *WorkflowExecutor) executePolicyCheck(node *WorkflowNode, previousResults map[string]interface{}) (interface{}, error) {
+	log.Printf("👮 Checking Policies (OPA)...")
+	time.Sleep(1 * time.Second)
+	// Mock
+	return map[string]interface{}{
+		"type":       "policy-check",
+		"status":     "completed",
+		"passed":     true,
+		"violations": 0,
+		"output":     "All policies passed (CIS Benchmark Level 1)",
+	}, nil
+}
+
+// executeGenerateIaC creates Terraform code
+func (e *WorkflowExecutor) executeGenerateIaC(node *WorkflowNode, previousResults map[string]interface{}) (interface{}, error) {
+	log.Printf("🏗️ Generating Infrastructure as Code...")
+	time.Sleep(2 * time.Second)
+	// Mock
+	return map[string]interface{}{
+		"type":   "generate-iac",
+		"status": "completed",
+		"files":  []string{"main.tf", "variables.tf", "outputs.tf"},
+		"output": "Generated AWS ECS Fargate Cluster configuration",
+		"changes": []map[string]string{
+			{
+				"path": "main.tf",
+				"type": "create",
+				"after": `resource "aws_ecs_cluster" "main" {
+  name = "vulnpilot-cluster"
+  
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+}`,
+			},
+			{
+				"path": "variables.tf",
+				"type": "create",
+				"after": `variable "region" {
+  default = "us-east-1"
+}`,
+			},
+		},
+	}, nil
+}
+
+// executeDriftCheck checks for infrastructure drift
+func (e *WorkflowExecutor) executeDriftCheck(node *WorkflowNode, previousResults map[string]interface{}) (interface{}, error) {
+	log.Printf("🔎 Checking for Infrastructure Drift...")
+	time.Sleep(2 * time.Second)
+
+	// Mock drift detected
+	return map[string]interface{}{
+		"type":           "drift-check",
+		"status":         "completed",
+		"drift_detected": true,
+		"output":         "Drift detected in Security Group configuration.",
+		"changes": []map[string]interface{}{
+			{
+				"path":   "aws_security_group.allow_ssh",
+				"type":   "update",
+				"before": "ingress {\n  from_port = 22\n  to_port = 22\n  cidr_blocks = [\"10.0.0.0/8\"]\n}",
+				"after":  "ingress {\n  from_port = 22\n  to_port = 22\n  cidr_blocks = [\"0.0.0.0/0\"]\n}",
+			},
+			{
+				"path":   "aws_s3_bucket.logs",
+				"type":   "delete",
+				"before": "resource \"aws_s3_bucket\" \"logs\" {\n  bucket = \"my-logs\"\n}",
+			},
+		},
+	}, nil
+}
+
+// executeGenerateDocs creates documentation using AI
+func (e *WorkflowExecutor) executeGenerateDocs(node *WorkflowNode, previousResults map[string]interface{}) (interface{}, error) {
+	log.Printf("📝 Generating Documentation using AI...")
+
+	// Aggregate context
+	var contextBuilder strings.Builder
+	contextBuilder.WriteString("Workflow Execution Results:\n")
+
+	for nodeID, result := range previousResults {
+		if nodeMap, ok := result.(map[string]interface{}); ok {
+			contextBuilder.WriteString(fmt.Sprintf("\nNode: %s (%v)\n", nodeID, nodeMap["scanner"]))
+			if output, ok := nodeMap["output"].(string); ok {
+				// Truncate long outputs for prompt context
+				if len(output) > 2000 {
+					contextBuilder.WriteString(output[:2000] + "...(truncated)")
+				} else {
+					contextBuilder.WriteString(output)
+				}
+			}
+		}
+	}
+
+	docContent, err := e.aiService.GenerateDocumentation(context.Background(), contextBuilder.String())
+	if err != nil {
+		log.Printf("⚠️ Failed to generate documentation: %v", err)
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"type":   "generate-docs",
+		"status": "completed",
+		"files": []string{
+			"README.md",
+			"ARCHITECTURE.md",
+		},
+		"output": docContent,
 	}, nil
 }

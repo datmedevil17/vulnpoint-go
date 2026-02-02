@@ -226,3 +226,56 @@ func (h *WorkflowHandler) ListWorkflowExecutions(c *gin.Context) {
 
 	utils.SuccessResponse(c, executions)
 }
+
+// GetExecution retrieves a specific workflow execution
+func (h *WorkflowHandler) GetExecution(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		utils.UnauthorizedResponse(c, "User not authenticated")
+		return
+	}
+
+	executionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		utils.BadRequestResponse(c, "Invalid execution ID")
+		return
+	}
+
+	execution, err := h.workflowService.GetExecution(executionID, userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			utils.NotFoundResponse(c, "Execution not found")
+			return
+		}
+		utils.InternalErrorResponse(c, "Failed to fetch execution")
+		return
+	}
+
+	utils.SuccessResponse(c, execution)
+}
+
+// DeleteWorkflowExecution deletes a workflow execution
+func (h *WorkflowHandler) DeleteWorkflowExecution(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		utils.UnauthorizedResponse(c, "User not authenticated")
+		return
+	}
+
+	executionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		utils.BadRequestResponse(c, "Invalid execution ID")
+		return
+	}
+
+	if err := h.workflowService.DeleteWorkflowExecution(executionID, userID); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			utils.NotFoundResponse(c, "Report not found")
+			return
+		}
+		utils.InternalErrorResponse(c, "Failed to delete report")
+		return
+	}
+
+	utils.SuccessMessageResponse(c, "Report deleted successfully", nil)
+}

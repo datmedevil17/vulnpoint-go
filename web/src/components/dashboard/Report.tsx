@@ -16,10 +16,12 @@ import {
   Mail,
   MessageSquare,
   Github,
-  FileText
+  FileText,
+  Trash2
 } from "lucide-react";
 import { workflowApi } from "@/hooks/useWorkflow";
 import { toast } from "sonner";
+import DiffViewer from "@/components/shared/DiffViewer";
 
 // Define types for execution results
 interface ExecutionResult {
@@ -64,11 +66,16 @@ const ReportCardPage = () => {
 
   // Format relative time
   const getRelativeTime = (dateString: string) => {
+    if (!dateString) return "Pending..."; // Handle missing date
+    
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Invalid Date";
+
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    if (diffInSeconds < 60) return "just now";
+    if (diffInSeconds < 5) return "just now";
+    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
     if (diffInSeconds < 120) return "1 min ago";
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} mins ago`;
     if (diffInSeconds < 7200) return "1 hour ago";
@@ -138,6 +145,21 @@ const ReportCardPage = () => {
       toast.error("Failed to execute workflow");
     }
   };
+
+  // Delete workflow report
+  const handleDelete = async (reportId: string) => {
+      try {
+          if (!window.confirm("Are you sure you want to delete this report?")) return;
+          
+          await workflowApi.deleteExecutionResult(reportId);
+          toast.success("Report deleted successfully");
+          // Update local state immediately
+          setReports(prev => prev.filter(r => r.id !== reportId));
+      } catch (error) {
+          console.error("Delete failed", error);
+          toast.error("Failed to delete report");
+      }
+  }
 
   // View report details
   const viewDetails = (report: ExecutionResult) => {
@@ -285,6 +307,17 @@ const ReportCardPage = () => {
                       >
                         <PlusCircle className="h-3 w-3 mr-1" />
                         Run
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost" 
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10"
+                        onClick={(e) => {
+                           e.stopPropagation();
+                           handleDelete(report.id);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </CardContent>
@@ -460,6 +493,37 @@ const ReportCardPage = () => {
                         })}
                         </div>
                       </div>
+
+                      {/* Infrastructure Diffs Section */}
+                      {selectedReport.results && Object.entries(selectedReport.results).some(([, result]: any) => result && result.changes && result.changes.length > 0) && (
+                        <div className="mt-8">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded">
+                              <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <h3 className="font-medium text-gray-700 dark:text-gray-300">Infrastructure Changes</h3>
+                          </div>
+                          
+                          <div className="space-y-6">
+                            {Object.entries(selectedReport.results).map(([nodeId, result]: any) => {
+                              if (!result || !result.changes || result.changes.length === 0) return null;
+                              
+                              return (
+                                <div key={nodeId} className="space-y-2">
+                                  <h4 className="text-sm font-medium flex items-center gap-2">
+                                    <span className="text-muted-foreground">Node:</span> 
+                                    {nodeId}
+                                    <Badge variant="outline" className="text-xs font-normal">
+                                      {result.type}
+                                    </Badge>
+                                  </h4>
+                                  <DiffViewer changes={result.changes} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

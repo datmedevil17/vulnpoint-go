@@ -19,7 +19,15 @@ export type NodeType =
   | "auto-fix"
   | "email"
   | "github-issue"
-  | "slack";
+  | "slack"
+  | "decision"
+  | "estimate-cost"
+  | "policy-check"
+  | "generate-iac"
+  | "drift-check"
+  | "kube-bench"
+  | "iac-scan"
+  | "generate-docs";
 
 export interface WorkflowNode extends Node {
   type: NodeType;

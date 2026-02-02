@@ -110,3 +110,24 @@ func (s *WorkflowService) ListWorkflowExecutions(userID uuid.UUID) ([]models.Wor
 
 	return executions, nil
 }
+
+// GetExecution retrieves a specific workflow execution
+func (s *WorkflowService) GetExecution(executionID, userID uuid.UUID) (*models.WorkflowExecution, error) {
+	var execution models.WorkflowExecution
+	if err := s.db.Where("id = ? AND user_id = ?", executionID, userID).First(&execution).Error; err != nil {
+		return nil, err
+	}
+	return &execution, nil
+}
+
+// DeleteWorkflowExecution deletes a workflow execution report
+func (s *WorkflowService) DeleteWorkflowExecution(executionID, userID uuid.UUID) error {
+	result := s.db.Where("id = ? AND user_id = ?", executionID, userID).Delete(&models.WorkflowExecution{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}

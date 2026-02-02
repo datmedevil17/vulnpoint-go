@@ -9,9 +9,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Loader2, Bot, Wand2 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+import { Sparkles, Loader2, Bot, Wand2, Shield, Zap, Lock, ArrowRight } from "lucide-react";
+
 
 interface AIAssistantSheetProps {
   open: boolean;
@@ -37,87 +36,102 @@ const AIAssistantSheet = ({
     setPrompt(text);
   };
 
+  const templates = [
+    {
+      id: 1,
+      icon: <Lock className="w-4 h-4 text-orange-500" />,
+      title: "Secrets & SAST Pipeline",
+      desc: "Gitleaks + Semgrep → GitHub Issue",
+      prompt: "Scan my github repo for secrets and vulnerable configurations using Semgrep, then create a GitHub issue for findings."
+    },
+    {
+      id: 2,
+      icon: <Shield className="w-4 h-4 text-blue-500" />,
+      title: "Daily Web Audit",
+      desc: "Scheduled Nikto/OWASP → Email Report",
+      prompt: "Run a full OWASP scan on my website every day at midnight. If vulnerabilities are found, email security@company.com."
+    },
+    {
+      id: 3,
+      icon: <Zap className="w-4 h-4 text-yellow-500" />,
+      title: "Auto-Patch Dependencies",
+      desc: "Trivy Scan → Auto-Fix PR for Criticals",
+      prompt: "Check for new CVEs in my dependencies using Trivy. If critical, use auto-fix to create a PR updating the package."
+    }
+  ];
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md flex flex-col h-full">
-        <SheetHeader className="space-y-4 pb-4 border-b">
-          <SheetTitle className="flex items-center gap-2 text-xl">
-            <Bot className="w-6 h-6 text-indigo-500" />
+      <SheetContent className="sm:max-w-lg flex flex-col h-full border-l border-border bg-background/95 backdrop-blur-xl">
+        <SheetHeader className="pb-6 border-b border-border/50">
+          <SheetTitle className="flex items-center gap-3 text-2xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
+            <Bot className="w-8 h-8 text-indigo-500" />
             AI Architect
           </SheetTitle>
-          <SheetDescription className="text-base text-gray-500 dark:text-gray-400">
-            Describe your security workflow needs, and I'll architect the perfect pipeline for you.
+          <SheetDescription className="text-base text-muted-foreground">
+            Describe your security goals, and I'll build the perfect workflow.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 py-6 space-y-6">
-          <div className="space-y-3">
-            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-              Your Requirements
-            </label>
-            <Textarea
-              placeholder="e.g. I need to scan a GitHub repo for secrets every 6 hours, run a dependency check, and if anything critical is found, create a high-priority Jira ticket and slack the security team..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="min-h-[150px] resize-none text-base p-4 focus-visible:ring-indigo-500 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-            />
-            <p className="text-xs text-muted-foreground text-right">
-              Be as specific as you like about tools and conditions.
-            </p>
+        <div className="flex-1 py-6 flex flex-col gap-6 overflow-hidden">
+          {/* Quick Start Templates */}
+          <div className="space-y-3 shrink-0">
+             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground px-1">
+                <Wand2 className="w-4 h-4" />
+                <span>Quick Start Templates</span>
+             </div>
+             <div className="grid gap-3">
+                {templates.map((t) => (
+                  <button 
+                    key={t.id}
+                    onClick={() => handleQuickPrompt(t.prompt)}
+                    className="group relative flex items-center gap-4 p-3 rounded-xl border border-border/50 bg-card/50 hover:bg-accent hover:border-indigo-500/30 transition-all duration-300 text-left"
+                  >
+                    <div className="p-2 rounded-lg bg-background shadow-sm group-hover:scale-110 transition-transform duration-300">
+                      {t.icon}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm text-foreground mb-0.5">{t.title}</div>
+                      <div className="text-xs text-muted-foreground">{t.desc}</div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+                  </button>
+                ))}
+             </div>
           </div>
 
-          <div className="space-y-3">
-             <div className="flex items-center gap-2">
-                <Wand2 className="w-3.5 h-3.5 text-indigo-500" />
-                <label className="text-sm font-medium">Quick Start Templates</label>
-             </div>
-             <ScrollArea className="h-[200px] rounded-md border p-4 bg-slate-50 dark:bg-slate-900/50">
-                <div className="space-y-2">
-                  <button 
-                    onClick={() => handleQuickPrompt("Scan my github repo for secrets and vulnerable configurations using Semgrep, then create a GitHub issue for findings.")}
-                    className="w-full text-left text-sm p-3 rounded-md bg-white dark:bg-slate-800 border hover:border-indigo-500 hover:shadow-sm transition-all duration-200"
-                  >
-                    <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">Secrets & SAST Pipeline</div>
-                    <div className="text-slate-500 dark:text-slate-400 text-xs line-clamp-2">Full code scan with Gitleaks + Semgrep &gt; GitHub Issue</div>
-                  </button>
-
-                  <button 
-                     onClick={() => handleQuickPrompt("Run a full OWASP scan on my website every day at midnight. If vulnerabilities are found, email security@company.com.")}
-                     className="w-full text-left text-sm p-3 rounded-md bg-white dark:bg-slate-800 border hover:border-indigo-500 hover:shadow-sm transition-all duration-200"
-                   >
-                    <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">Daily Web Audit</div>
-                    <div className="text-slate-500 dark:text-slate-400 text-xs line-clamp-2">Scheduled Nikto/OWASP scan &gt; Email Report</div>
-                  </button>
-                  
-                   <button 
-                     onClick={() => handleQuickPrompt("Check for new CVEs in my dependencies using Trivy. If critical, use auto-fix to create a PR updating the package.")}
-                     className="w-full text-left text-sm p-3 rounded-md bg-white dark:bg-slate-800 border hover:border-indigo-500 hover:shadow-sm transition-all duration-200"
-                   >
-                    <div className="font-medium text-slate-900 dark:text-slate-100 mb-1">Auto-Patch Dependencies</div>
-                    <div className="text-slate-500 dark:text-slate-400 text-xs line-clamp-2">Trivy Scan &gt; Auto-Fix PR for critical CVEs</div>
-                  </button>
-                </div>
-             </ScrollArea>
+          <div className="relative flex-1 flex flex-col">
+            <div className={`
+              absolute inset-0 rounded-2xl p-[1px] bg-gradient-to-b from-indigo-500/20 to-purple-500/20 pointer-events-none 
+              ${Boolean(prompt) ? 'opacity-100' : 'opacity-50'} transition-opacity
+            `} />
+            <Textarea
+              placeholder="Or describe your custom workflow needs..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              className="flex-1 resize-none border-none bg-card/30 p-6 text-base leading-relaxed focus-visible:ring-0 rounded-2xl"
+            />
+            {/* Character count or helper */}
+            <div className="absolute bottom-4 right-4 text-xs text-muted-foreground/50 pointer-events-none">
+              AI-Powered Generation
+            </div>
           </div>
         </div>
 
-        <SheetFooter className="border-t pt-4 sm:justify-between items-center bg-slate-50 -mx-6 -mb-6 px-6 py-4 dark:bg-slate-900">
-           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-             Cancel
-           </Button>
+        <SheetFooter className="border-t border-border/50 pt-6">
           <Button
             onClick={handleGenerate}
             disabled={!prompt.trim() || isGenerating}
-            className="w-full sm:w-auto gap-2 bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 transition-all duration-200"
+            className="w-full h-12 text-base font-medium bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/20 transition-all duration-300 rounded-xl"
           >
             {isGenerating ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Architecting Workflow...
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Architecting Solution...
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-5 h-5 mr-2" />
                 Generate Workflow
               </>
             )}

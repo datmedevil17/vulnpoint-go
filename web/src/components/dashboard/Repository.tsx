@@ -7,6 +7,8 @@ import { RepositoryError } from "@/components/dashboard/repository/RepositoryErr
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { ServiceConfig } from "@/components/dashboard/repository/ServiceConfig";
+
 const ITEMS_PER_PAGE = 6;
 
 const RepositoryList = () => {
@@ -73,7 +75,8 @@ const RepositoryList = () => {
   }
 
   return (
-    <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8 flex flex-col h-full bg-white dark:bg-zinc-950 rounded-xl">
+    <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8 flex flex-col h-full bg-white dark:bg-zinc-950 rounded-xl overflow-auto">
+      <ServiceConfig />
       <RepositoryHeader
         totalRepos={filteredRepos.length}
         onSearch={handleSearch}

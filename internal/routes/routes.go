@@ -53,7 +53,9 @@ func SetupRoutes(router *gin.Engine, cfg *RouterConfig) {
 			{
 				workflows.POST("", cfg.WorkflowHandler.CreateWorkflow)
 				workflows.GET("", cfg.WorkflowHandler.ListWorkflows)
+				workflows.GET("/executions/:id", cfg.WorkflowHandler.GetExecution)
 				workflows.GET("/reports", cfg.WorkflowHandler.ListWorkflowExecutions)
+				workflows.DELETE("/reports/:id", cfg.WorkflowHandler.DeleteWorkflowExecution)
 				workflows.GET("/:id", cfg.WorkflowHandler.GetWorkflow)
 				workflows.PUT("/:id", cfg.WorkflowHandler.UpdateWorkflow)
 				workflows.DELETE("/:id", cfg.WorkflowHandler.DeleteWorkflow)

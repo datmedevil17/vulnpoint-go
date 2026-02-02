@@ -118,6 +118,7 @@
     "0%": {
       boxshadow: "0 0 0 rgba(167, 139, 250, 0)";
     }
+
     ,
     "100%": {
       boxshadow: "0 0 16px rgba(167, 139, 250, 0.3)";
@@ -129,8 +130,37 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1 {
+    font-family: 'Orbitron', sans-serif;
+    @apply font-black uppercase tracking-widest;
+  }
+
+  h2 {
+    font-family: 'Orbitron', sans-serif;
+    @apply font-bold uppercase tracking-wider;
+  }
+
+  h3 {
+    font-family: 'Orbitron', sans-serif;
+    @apply font-semibold tracking-wide;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-family: 'Orbitron', sans-serif;
+    @apply font-medium tracking-wide;
+  }
+
+  label,
+  .label {
+    font-family: 'Orbitron', sans-serif;
+    @apply font-medium tracking-wider text-xs uppercase text-muted-foreground;
   }
 }
 

@@ -42,6 +42,7 @@ import WorkflowNode from "@/components/workflowbuilder/WorkflowNode";
 import EmptyState from "@/components/dashboard/workflow/EmptyState";
 import NodeConfigDialog from "@/components/workflowbuilder/NodeConfigDialog";
 import AIAssistantSheet from "@/components/workflowbuilder/AIAssistantSheet";
+import { WorkflowTerminal } from "@/components/workflowbuilder/WorkflowTerminal";
 import { useWorkflowStore } from "@/lib/store";
 
 import { workflowApi } from "@/hooks/useWorkflow";
@@ -73,10 +74,26 @@ const nodeTypes: NodeTypes = {
   email: WorkflowNode,
   "github-issue": WorkflowNode,
   slack: WorkflowNode,
+  decision: WorkflowNode,
+  "estimate-cost": WorkflowNode,
+  "policy-check": WorkflowNode,
+  "generate-iac": WorkflowNode,
+  "drift-check": WorkflowNode,
+  "kube-bench": WorkflowNode,
+  "iac-scan": WorkflowNode,
+  "generate-docs": WorkflowNode,
 };
 
 const TERMINAL_NODE_TYPES = ["email", "slack", "github-issue"];
-const CONFIGURABLE_NODE_TYPES = [...TERMINAL_NODE_TYPES, "auto-fix"];
+const CONFIGURABLE_NODE_TYPES = [
+  ...TERMINAL_NODE_TYPES,
+  "auto-fix",
+  "decision",
+  "estimate-cost",
+  "policy-check",
+  "generate-iac",
+  "generate-docs",
+];
 
 const WorkflowBuilderContent = () => {
   const { id } = useParams<{ id: string }>();
@@ -103,6 +120,8 @@ const WorkflowBuilderContent = () => {
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [executionId, setExecutionId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -524,6 +543,8 @@ const WorkflowBuilderContent = () => {
         description: `Execution ID: ${result.data?.execution_id || 'started'}. Check the Reports section for results.`,
         duration: 5000
       });
+      setExecutionId(result.data?.execution_id);
+      setShowTerminal(true);
 
       
     } catch (error) {
@@ -867,6 +888,14 @@ const WorkflowBuilderContent = () => {
         onOpenChange={setShowAIAssistant}
         onGenerate={handleAIGenerate}
         isGenerating={isGenerating}
+      />
+      
+      <WorkflowTerminal 
+        open={showTerminal} 
+        onClose={() => setShowTerminal(false)}
+        workflowId={workflow?.id}
+        executionId={executionId}
+        nodes={nodes}
       />
     </>
   );

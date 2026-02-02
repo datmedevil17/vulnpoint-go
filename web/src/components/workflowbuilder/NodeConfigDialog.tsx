@@ -130,6 +130,94 @@ const NodeConfigDialog = ({
             </div>
           )}
 
+          {nodeType === "estimate-cost" && (
+            <div className="space-y-2">
+              <Label htmlFor="budget">Monthly Budget Limit ($)</Label>
+              <Input
+                id="budget"
+                type="number"
+                defaultValue={initialData?.budget || "100"}
+                onChange={(e) => {
+                  initialData.budget = e.target.value;
+                }}
+                placeholder="1000"
+              />
+              <p className="text-xs text-muted-foreground">
+                ⚠️ Workflow will require manual approval if estimated cost exceeds this amount.
+              </p>
+            </div>
+          )}
+
+          {nodeType === "policy-check" && (
+            <div className="space-y-2">
+              <Label htmlFor="policy">Compliance Standard</Label>
+              <Select
+                defaultValue={initialData?.policy || "cis"}
+                onValueChange={(val) => (initialData.policy = val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a standard" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cis">CIS Benchmarks Level 1</SelectItem>
+                  <SelectItem value="cis-2">CIS Benchmarks Level 2</SelectItem>
+                  <SelectItem value="soc2">SOC 2 Compliance</SelectItem>
+                  <SelectItem value="gdpr">GDPR Privacy</SelectItem>
+                  <SelectItem value="pci">PCI-DSS v4</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {nodeType === "decision" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="variable">Variable to Check</Label>
+                <Select
+                  defaultValue={initialData?.variable || "vulnerabilities"}
+                  onValueChange={(val) => (initialData.variable = val)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select variable" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vulnerabilities">Vulnerability Count</SelectItem>
+                    <SelectItem value="risk_score">Security Risk Score</SelectItem>
+                    <SelectItem value="cost">Estimated Cost</SelectItem>
+                    <SelectItem value="manual_input">User Input (Yes/No)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label htmlFor="operator">Operator</Label>
+                    <Select
+                      defaultValue={initialData?.operator || "gt"}
+                      onValueChange={(val) => (initialData.operator = val)}
+                    >
+                      <SelectTrigger>
+                         <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gt">{">"} Greater Than</SelectItem>
+                        <SelectItem value="lt">{"<"} Less Than</SelectItem>
+                        <SelectItem value="eq">{"="} Equals</SelectItem>
+                        <SelectItem value="neq">{"!="} Not Equals</SelectItem>
+                      </SelectContent>
+                    </Select>
+                 </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="value">Threshold Value</Label>
+                    <Input 
+                      defaultValue={initialData?.value || "0"} 
+                      onChange={(e) => (initialData.value = e.target.value)}
+                    />
+                 </div>
+              </div>
+            </div>
+          )}
+
           {nodeType === "auto-fix" && (
             <>
               <div className="space-y-2">

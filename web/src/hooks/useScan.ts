@@ -2,12 +2,7 @@ import { useState, useCallback } from "react";
 import api, { getErrorMessage } from "@/lib/api";
 import { API_ENDPOINTS } from "@/lib/apiEndpoints";
 
-interface ScanRequest {
-  target: string;
-  ports?: string;
-  wordlist?: string;
-  options?: Record<string, any>;
-}
+
 
 interface ScanResult {
   id: string;

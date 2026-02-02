@@ -7,6 +7,8 @@ import Report from "@/components/dashboard/Report";
 import PrivateRoute from "@/components/auth/PrivateRoute";
 import WorkflowBuilder from "@/pages/WorkflowBuilder";
 import AuthCallback from "@/pages/AuthCallback";
+import Overview from "@/components/dashboard/Overview";
+
 
 const AppRoutes = () => {
   return (
@@ -15,7 +17,7 @@ const AppRoutes = () => {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route element={<PrivateRoute />}>
         <Route path="/dashboard/*" element={<Dashboard />}>
-          <Route index element={<RepositoryList />} />
+          <Route index element={<Overview />} />
           <Route path="workflow" element={<Workflow />} />
           <Route path="repository" element={<RepositoryList />} />
           <Route path="report" element={<Report />} />

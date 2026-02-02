@@ -17,6 +17,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["Inconsolata", "monospace"],
+        mono: ["Inconsolata", "monospace"],
+        heading: ["Orbitron", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

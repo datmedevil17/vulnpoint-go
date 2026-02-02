@@ -93,6 +93,16 @@ export const workflowApi = {
     }
   },
 
+  getExecution: async (id: string): Promise<any> => {
+    try {
+      const response = await api.get(API_ENDPOINTS.WORKFLOWS.STATUS(id));
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting execution ${id}:`, error);
+      throw error;
+    }
+  },
+
   getExecutionStatus: async (id: string): Promise<any> => {
     try {
       const response = await api.get(API_ENDPOINTS.WORKFLOWS.STATUS(id));
@@ -112,6 +122,8 @@ export const workflowApi = {
       throw error;
     }
   },
+  
+  deleteExecutionResult: (id: string) => api.delete(`/workflows/reports/${id}`),
 
   executeNode: (nodeData: any) => api.post("/workflows/execute-node", nodeData),
   

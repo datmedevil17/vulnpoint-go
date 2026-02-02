@@ -212,6 +212,37 @@ func cleanJSON(s string) string {
 	return s
 }
 
+// GenerateDocumentation generates project documentation using Groq
+func (s *AIService) GenerateDocumentation(ctx context.Context, contextData string) (string, error) {
+	prompt := fmt.Sprintf(`You are a Technical Writer. Generate comprehensive documentation for the following infrastructure and security context.
+Return the response in Markdown format.
+
+Context:
+%s
+
+Please generate:
+1. A README.md content with:
+   - Project Overview
+   - Architecture Description
+   - Security Posture (based on scan results)
+   - Setup Instructions
+2. An ARCHITECTURE.md content with:
+   - Diagram description
+   - Decision Records (ADRs) based on findings`, contextData)
+
+	// User explicitly requested Groq
+	if s.config.AI.GroqAPIKey != "" {
+		return s.callGroq(ctx, prompt)
+	}
+
+	// Fallback to Gemini if Groq not configured
+	if s.config.AI.GeminiAPIKey != "" {
+		return s.callGemini(ctx, prompt)
+	}
+
+	return "", fmt.Errorf("no AI API keys configured")
+}
+
 // callGemini makes a request to Google Gemini API
 func (s *AIService) callGemini(ctx context.Context, prompt string) (string, error) {
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=%s", s.config.AI.GeminiAPIKey)

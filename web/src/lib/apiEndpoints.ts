@@ -28,7 +28,7 @@ export const API_ENDPOINTS = {
     BASE: '/api/workflows',
     BY_ID: (id: string) => `/api/workflows/${id}`,
     EXECUTE: (id: string) => `/api/workflows/${id}/execute`,
-    STATUS: (id: string) => `/api/workflows/${id}/status`,
+    STATUS: (id: string) => `/api/workflows/executions/${id}`,
     REPORTS: '/api/workflows/reports',
   },
 
